@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Art Creation — Flow Field Generator</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0c;color:#e8e8ee;font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden}
+  #c{display:block;position:fixed;inset:0}
+  #panel{position:fixed;top:16px;right:16px;width:230px;padding:15px 17px;background:rgba(18,18,24,.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);border-radius:14px;font-size:13px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  h1{font-size:14px;margin:0 0 2px}
+  .sub{color:#8a8a98;font-size:11px;margin:0 0 10px}
+  label{display:block;color:#9aa;margin:8px 0 3px;font-size:11px}
+  input[type=range]{width:100%;accent-color:#c39bff}
+  .row{display:flex;gap:8px;margin-top:10px}
+  button{flex:1;padding:8px;border:none;border-radius:9px;cursor:pointer;background:#2a2438;color:#e8e8ee;font-size:12px;transition:.15s}
+  button:hover{background:#382f4d}
+  button.p{background:#c39bff;color:#1a0e2e;font-weight:600}
+  .pal{display:flex;gap:5px;margin-top:5px}
+  .pal div{flex:1;height:16px;border-radius:4px;cursor:pointer;outline:2px solid transparent;transition:.1s}
+  .pal div.sel{outline-color:#fff}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h1>Flow Field</h1>
+  <p class="sub">Perlin-noise vector field — thousands of advected particles trace emergent structure.</p>
+  <label>Palette</label>
+  <div class="pal" id="pal"></div>
+  <label>Field scale — <span id="scaleV"></span></label>
+  <input id="scale" type="range" min="5" max="120" value="32">
+  <label>Particles — <span id="nV"></span></label>
+  <input id="n" type="range" min="500" max="5000" step="100" value="2500">
+  <label>Trail fade — <span id="fadeV"></span></label>
+  <input id="fade" type="range" min="0" max="40" value="6">
+  <div class="row">
+    <button class="p" id="regen">New Seed</button>
+    <button id="save">Save PNG</button>
+  </div>
+</div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+let W,H;
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight;clear();}
+addEventListener('resize',resize);
+
+// Gradient noise (Perlin-style, hash-based)
+function makeNoise(seed){
+  const perm=new Uint8Array(512);const base=[...Array(256).keys()];let s=seed>>>0;
+  const rng=()=>(s=(s*1664525+1013904223)>>>0)/4294967296;
+  for(let i=255;i>0;i--){const j=(rng()*(i+1))|0;[base[i],base[j]]=[base[j],base[i]];}
+  for(let i=0;i<512;i++)perm[i]=base[i&255];
+  const fade=t=>t*t*t*(t*(t*6-15)+10),lerp=(a,b,t)=>a+t*(b-a),grad=(h,x,y)=>(h&1?x:-x)+(h&2?y:-y);
+  return(x,y)=>{const X=Math.floor(x)&255,Y=Math.floor(y)&255;x-=Math.floor(x);y-=Math.floor(y);const u=fade(x),v=fade(y),A=perm[X]+Y,B=perm[X+1]+Y;return(lerp(lerp(grad(perm[A],x,y),grad(perm[B],x-1,y),u),lerp(grad(perm[A+1],x,y-1),grad(perm[B+1],x-1,y-1),u),v)+1)/2;};
+}
+
+const PALETTES=[
+  ['#ff6b6b','#feca57','#48dbfb','#ff9ff3'],
+  ['#c39bff','#7d5fff','#18dcff','#e8e8ee'],
+  ['#06d6a0','#118ab2','#ffd166','#ef476f'],
+  ['#ffadad','#ffd6a5','#fdffb6','#caffbf'],
+  ['#e63946','#457b9d','#a8dadc','#f1faee']
+];
+let palIdx=1;
+const palEl=document.getElementById('pal');
+PALETTES.forEach((p,i)=>{const d=document.createElement('div');d.style.background='linear-gradient(90deg,'+p.join(',')+')';if(i===palIdx)d.className='sel';d.onclick=()=>{palIdx=i;[...palEl.children].forEach(x=>x.className='');d.className='sel';};palEl.appendChild(d);});
+
+let noise,seed,pts=[],SCALE=32,FADE=6;
+function clear(){ctx.fillStyle='#0a0a0c';ctx.fillRect(0,0,W,H);}
+function reseed(){seed=(Math.random()*1e9)|0;noise=makeNoise(seed);spawn();clear();}
+function spawn(){const N=+document.getElementById('n').value;pts=[];for(let i=0;i<N;i++)pts.push(newP());}
+function newP(){return{x:Math.random()*W,y:Math.random()*H,life:60+Math.random()*180,col:PALETTES[palIdx][(Math.random()*PALETTES[palIdx].length)|0]};}
+function step(){
+  ctx.fillStyle='rgba(10,10,12,'+(FADE/100)+')';ctx.fillRect(0,0,W,H);
+  for(const p of pts){
+    const a=noise(p.x/SCALE/10,p.y/SCALE/10)*Math.PI*4;
+    const nx=p.x+Math.cos(a)*1.6,ny=p.y+Math.sin(a)*1.6;
+    ctx.strokeStyle=p.col;ctx.globalAlpha=.33;ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(nx,ny);ctx.stroke();
+    p.x=nx;p.y=ny;p.life--;
+    if(p.life<0||p.x<0||p.x>W||p.y<0||p.y>H)Object.assign(p,newP());
+  }
+  ctx.globalAlpha=1;requestAnimationFrame(step);
+}
+const $=id=>document.getElementById(id);
+function sync(){SCALE=+$('scale').value;FADE=+$('fade').value;$('scaleV').textContent=SCALE;$('nV').textContent=$('n').value;$('fadeV').textContent=FADE;}
+$('scale').oninput=sync;$('fade').oninput=sync;$('n').oninput=()=>{sync();spawn();};
+$('regen').onclick=reseed;
+$('save').onclick=()=>{const a=document.createElement('a');a.download='flowfield_'+seed+'.png';a.href=c.toDataURL();a.click();};
+resize();sync();reseed();step();
+</script>
+</body>
+</html>
