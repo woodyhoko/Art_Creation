@@ -20,17 +20,24 @@
   .pal{display:flex;gap:5px;margin-top:5px}
   .pal div{flex:1;height:16px;border-radius:4px;cursor:pointer;outline:2px solid transparent;transition:.1s}
   .pal div.sel{outline-color:#fff}
+  @media(max-width:560px){
+    #panel{top:auto;bottom:0;left:0;right:0;width:100%;border-radius:14px 14px 0 0;max-height:48vh;overflow-y:auto}
+  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="panel">
   <h1>Flow Field</h1>
-  <p class="sub">Perlin-noise vector field — thousands of advected particles trace emergent structure.</p>
+  <p class="sub">Perlin-noise vector field — thousands of advected particles trace emergent structure. Stack several field scales for fractal detail.</p>
   <label>Palette</label>
   <div class="pal" id="pal"></div>
   <label>Field scale — <span id="scaleV"></span></label>
   <input id="scale" type="range" min="5" max="120" value="32">
+  <label>Combined scales (octaves) — <span id="octV"></span></label>
+  <input id="oct" type="range" min="1" max="5" value="1">
+  <label>Scale blend (persistence) — <span id="persV"></span></label>
+  <input id="pers" type="range" min="20" max="80" value="50">
   <label>Particles — <span id="nV"></span></label>
   <input id="n" type="range" min="500" max="5000" step="100" value="2500">
   <label>Trail fade — <span id="fadeV"></span></label>
@@ -67,15 +74,30 @@ let palIdx=1;
 const palEl=document.getElementById('pal');
 PALETTES.forEach((p,i)=>{const d=document.createElement('div');d.style.background='linear-gradient(90deg,'+p.join(',')+')';if(i===palIdx)d.className='sel';d.onclick=()=>{palIdx=i;[...palEl.children].forEach(x=>x.className='');d.className='sel';};palEl.appendChild(d);});
 
-let noise,seed,pts=[],SCALE=32,FADE=6;
+let noise,seed,pts=[],SCALE=32,FADE=6,OCT=1,PERS=0.5;
 function clear(){ctx.fillStyle='#0a0a0c';ctx.fillRect(0,0,W,H);}
 function reseed(){seed=(Math.random()*1e9)|0;noise=makeNoise(seed);spawn();clear();}
 function spawn(){const N=+document.getElementById('n').value;pts=[];for(let i=0;i<N;i++)pts.push(newP());}
 function newP(){return{x:Math.random()*W,y:Math.random()*H,life:60+Math.random()*180,col:PALETTES[palIdx][(Math.random()*PALETTES[palIdx].length)|0]};}
+
+// Combined field scales: sum several octaves of the noise at doubling
+// frequencies (halving-ish amplitude via persistence) — classic fractal/fBm
+// flow. OCT=1 reproduces the original single-scale field.
+function fieldAngle(x,y){
+  let sum=0,amp=1,freq=1,norm=0;
+  const bx=x/SCALE/10, by=y/SCALE/10;
+  for(let o=0;o<OCT;o++){
+    sum += (noise(bx*freq, by*freq)*2-1) * amp;  // centre each octave to [-1,1]
+    norm += amp;
+    freq *= 2; amp *= PERS;
+  }
+  return (sum/norm) * Math.PI*4;
+}
+
 function step(){
   ctx.fillStyle='rgba(10,10,12,'+(FADE/100)+')';ctx.fillRect(0,0,W,H);
   for(const p of pts){
-    const a=noise(p.x/SCALE/10,p.y/SCALE/10)*Math.PI*4;
+    const a=fieldAngle(p.x,p.y);
     const nx=p.x+Math.cos(a)*1.6,ny=p.y+Math.sin(a)*1.6;
     ctx.strokeStyle=p.col;ctx.globalAlpha=.33;ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(nx,ny);ctx.stroke();
     p.x=nx;p.y=ny;p.life--;
@@ -84,8 +106,12 @@ function step(){
   ctx.globalAlpha=1;requestAnimationFrame(step);
 }
 const $=id=>document.getElementById(id);
-function sync(){SCALE=+$('scale').value;FADE=+$('fade').value;$('scaleV').textContent=SCALE;$('nV').textContent=$('n').value;$('fadeV').textContent=FADE;}
-$('scale').oninput=sync;$('fade').oninput=sync;$('n').oninput=()=>{sync();spawn();};
+function sync(){
+  SCALE=+$('scale').value;FADE=+$('fade').value;OCT=+$('oct').value;PERS=+$('pers').value/100;
+  $('scaleV').textContent=SCALE;$('nV').textContent=$('n').value;$('fadeV').textContent=FADE;
+  $('octV').textContent=OCT===1?'1 (single)':OCT;$('persV').textContent=PERS.toFixed(2);
+}
+$('scale').oninput=sync;$('fade').oninput=sync;$('oct').oninput=()=>{sync();clear();};$('pers').oninput=()=>{sync();clear();};$('n').oninput=()=>{sync();spawn();};
 $('regen').onclick=reseed;
 $('save').onclick=()=>{const a=document.createElement('a');a.download='flowfield_'+seed+'.png';a.href=c.toDataURL();a.click();};
 resize();sync();reseed();step();
