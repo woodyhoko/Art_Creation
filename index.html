@@ -52,6 +52,15 @@
     section{padding:34px 0}.c{padding:20px}
     .grid{grid-template-columns:1fr}
   }
+  .demo-card{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(0,0,0,.22);box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .demo-bar{display:flex;align-items:center;gap:7px;padding:10px 15px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .demo-bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .demo-bar .t{margin-left:10px;font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+  .demo-frame{position:relative;width:100%;aspect-ratio:16/10;background:#0b0c12}
+  .demo-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+  .demo-cap{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:16px}
+  .demo-cap p{font-size:13px;color:var(--muted);max-width:560px}
+  @media(max-width:640px){.demo-frame{aspect-ratio:3/4}}
 </style></head>
 <body>
 <div class="mesh"></div><div class="grain"></div>
@@ -83,6 +92,19 @@
     <div class="lbl">Result</div>
     <div class="ttl">Sample generated abstract art.</div>
     <figure><img src="https://raw.githubusercontent.com/woodyhoko/Art_Creation/main/result.png" alt="Generated abstract art" loading="lazy"></figure>
+  </section>
+
+  <section>
+    <div class="lbl">live demo</div>
+    <div class="ttl">Generate it live.</div>
+    <div class="demo-card">
+      <div class="demo-bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">demo.html — generative flow-field</span></div>
+      <div class="demo-frame"><iframe src="demo.html" loading="lazy" title="Live generative flow-field art demo"></iframe></div>
+    </div>
+    <div class="demo-cap">
+      <p>A real-time generative flow-field canvas — colour and motion in the spirit of the per-resolution style approach behind the paper, rendered live in your browser.</p>
+      <a class="btn p" href="demo.html">▶ Open full demo</a>
+    </div>
   </section>
 
   <footer>
